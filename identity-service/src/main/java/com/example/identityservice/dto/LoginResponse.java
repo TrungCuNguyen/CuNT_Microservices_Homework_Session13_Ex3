@@ -34,3 +34,4 @@ public class LoginResponse {
         this.tokenType = tokenType;
     }
 }
+
