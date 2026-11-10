@@ -1,5 +1,7 @@
 package com.example.identityservice.controller;
 
+import com.example.identityservice.dto.LoginRequest;
+import com.example.identityservice.dto.LoginResponse;
 import com.example.identityservice.dto.RegisterRequest;
 import com.example.identityservice.dto.UserResponse;
 import com.example.identityservice.service.UserService;
@@ -22,6 +24,12 @@ public class AuthController {
     public ResponseEntity<UserResponse> register(@Valid @RequestBody RegisterRequest request) {
         UserResponse response = userService.register(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @PostMapping("/login")
+    public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
+        LoginResponse response = userService.login(request);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/test-token")

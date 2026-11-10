@@ -1,5 +1,7 @@
 package com.example.identityservice.service.impl;
 
+import com.example.identityservice.dto.LoginRequest;
+import com.example.identityservice.dto.LoginResponse;
 import com.example.identityservice.dto.RegisterRequest;
 import com.example.identityservice.dto.UserResponse;
 import com.example.identityservice.entity.User;
@@ -8,6 +10,7 @@ import com.example.identityservice.exception.ResourceNotFoundException;
 import com.example.identityservice.repository.UserRepository;
 import com.example.identityservice.service.UserService;
 import com.example.identityservice.util.JwtUtil;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,6 +47,20 @@ public class UserServiceImpl implements UserService {
 
         // Return user info without password
         return new UserResponse(savedUser.getId(), savedUser.getUsername(), savedUser.getRole());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public LoginResponse login(LoginRequest request) {
+        User user = userRepository.findByUsername(request.getUsername())
+                .orElseThrow(() -> new BadCredentialsException("Bad credentials"));
+
+        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+            throw new BadCredentialsException("Bad credentials");
+        }
+
+        String token = jwtUtil.generateToken(user);
+        return new LoginResponse(token, "Bearer");
     }
 
     @Override

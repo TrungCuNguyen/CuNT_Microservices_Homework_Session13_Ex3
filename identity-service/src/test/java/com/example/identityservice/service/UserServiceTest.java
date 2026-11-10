@@ -1,5 +1,7 @@
 package com.example.identityservice.service;
 
+import com.example.identityservice.dto.LoginRequest;
+import com.example.identityservice.dto.LoginResponse;
 import com.example.identityservice.dto.RegisterRequest;
 import com.example.identityservice.dto.UserResponse;
 import com.example.identityservice.entity.User;
@@ -16,6 +18,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 import java.util.Optional;
@@ -80,6 +83,51 @@ class UserServiceTest {
 
         assertThrows(DuplicateResourceException.class, () -> userService.register(registerRequest));
         verify(userRepository, never()).save(any(User.class));
+    }
+
+    @Test
+    @DisplayName("Should successfully authenticate and return token when login credentials match")
+    void login_Success() {
+        String hashedPassword = passwordEncoder.encode("password123");
+        User user = new User("u-1", "john_doe", hashedPassword, "USER");
+        when(userRepository.findByUsername("john_doe")).thenReturn(Optional.of(user));
+        when(jwtUtil.generateToken(user)).thenReturn("mock.login.jwt.token");
+
+        LoginRequest loginRequest = new LoginRequest("john_doe", "password123");
+        LoginResponse response = userService.login(loginRequest);
+
+        assertNotNull(response);
+        assertEquals("mock.login.jwt.token", response.getAccessToken());
+        assertEquals("Bearer", response.getTokenType());
+        verify(passwordEncoder, times(1)).matches("password123", hashedPassword);
+    }
+
+    @Test
+    @DisplayName("Should throw BadCredentialsException when password does not match")
+    void login_WrongPassword_ThrowsBadCredentials() {
+        String hashedPassword = passwordEncoder.encode("password123");
+        User user = new User("u-1", "john_doe", hashedPassword, "USER");
+        when(userRepository.findByUsername("john_doe")).thenReturn(Optional.of(user));
+
+        LoginRequest loginRequest = new LoginRequest("john_doe", "wrongPassword");
+
+        BadCredentialsException exception = assertThrows(BadCredentialsException.class,
+                () -> userService.login(loginRequest));
+        assertEquals("Bad credentials", exception.getMessage());
+        verify(jwtUtil, never()).generateToken(any());
+    }
+
+    @Test
+    @DisplayName("Should throw BadCredentialsException when username is not found")
+    void login_UserNotFound_ThrowsBadCredentials() {
+        when(userRepository.findByUsername("nonexistent")).thenReturn(Optional.empty());
+
+        LoginRequest loginRequest = new LoginRequest("nonexistent", "password123");
+
+        BadCredentialsException exception = assertThrows(BadCredentialsException.class,
+                () -> userService.login(loginRequest));
+        assertEquals("Bad credentials", exception.getMessage());
+        verify(jwtUtil, never()).generateToken(any());
     }
 
     @Test

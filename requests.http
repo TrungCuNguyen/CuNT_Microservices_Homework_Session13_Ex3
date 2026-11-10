@@ -44,4 +44,32 @@ GET http://localhost:8080/api/auth/test-token?username=admin_demo
 ### 7. Lấy JWT Token cho user không tồn tại (Kỳ vọng trả về 404 Not Found)
 GET http://localhost:8080/api/auth/test-token?username=non_existent_user
 
+### 8. Đăng nhập thành công (Kỳ vọng 200 OK & Access Token)
+POST http://localhost:8080/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "user_demo",
+  "password": "Password123@"
+}
+
+### 9. Đăng nhập thất bại - Sai mật khẩu (Kỳ vọng 401 Unauthorized & Bad credentials)
+POST http://localhost:8080/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "user_demo",
+  "password": "WrongPassword@"
+}
+
+### 10. Đăng nhập thất bại - Sai username (Kỳ vọng 401 Unauthorized & Bad credentials)
+POST http://localhost:8080/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "user_does_not_exist",
+  "password": "AnyPassword123@"
+}
+
+
 

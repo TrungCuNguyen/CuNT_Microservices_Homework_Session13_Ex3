@@ -1,5 +1,6 @@
 package com.example.identityservice.controller;
 
+import com.example.identityservice.dto.LoginRequest;
 import com.example.identityservice.dto.RegisterRequest;
 import com.example.identityservice.entity.User;
 import com.example.identityservice.repository.UserRepository;
@@ -104,5 +105,65 @@ class RegisterIntegrationTest {
         assertEquals("jwt_tester", claims.getSubject(), "Claim 'sub' must match registered username");
         assertEquals("MANAGER", claims.get("role", String.class), "Custom claim 'role' must match registered role");
         assertTrue(jwtUtil.isTokenValid(token, "jwt_tester"));
+    }
+
+    @Test
+    @DisplayName("Complete Login flow: Register user -> Login with valid credentials -> Expect 200 OK & valid JWT")
+    void testLoginFlow_Success() throws Exception {
+        // Register user
+        RegisterRequest registerReq = new RegisterRequest("login_user", "MyPassword123@", "USER");
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(registerReq)))
+                .andExpect(status().isCreated());
+
+        // Login with correct credentials
+        LoginRequest loginReq = new LoginRequest("login_user", "MyPassword123@");
+        MvcResult result = mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(loginReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").isNotEmpty())
+                .andExpect(jsonPath("$.tokenType").value("Bearer"))
+                .andExpect(header().doesNotExist("Set-Cookie")) // Verify Stateless (no JSESSIONID)
+                .andReturn();
+
+        String responseBody = result.getResponse().getContentAsString();
+        String token = objectMapper.readTree(responseBody).get("accessToken").asText();
+
+        // Verify claims in token
+        Claims claims = jwtUtil.extractAllClaims(token);
+        assertEquals("login_user", claims.getSubject());
+        assertEquals("USER", claims.get("role", String.class));
+    }
+
+    @Test
+    @DisplayName("Login flow with wrong password: Expect 401 Unauthorized with 'Bad credentials'")
+    void testLoginFlow_WrongPassword_Returns401() throws Exception {
+        RegisterRequest registerReq = new RegisterRequest("user_test_pwd", "CorrectPass123", "USER");
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(registerReq)))
+                .andExpect(status().isCreated());
+
+        LoginRequest loginReq = new LoginRequest("user_test_pwd", "WrongPass123");
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(loginReq)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401))
+                .andExpect(jsonPath("$.message").value("Bad credentials"));
+    }
+
+    @Test
+    @DisplayName("Login flow with nonexistent user: Expect 401 Unauthorized with 'Bad credentials'")
+    void testLoginFlow_NonExistentUser_Returns401() throws Exception {
+        LoginRequest loginReq = new LoginRequest("non_existent_user", "AnyPass123");
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(loginReq)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401))
+                .andExpect(jsonPath("$.message").value("Bad credentials"));
     }
 }

@@ -1,6 +1,8 @@
 package com.example.identityservice.controller;
 
 import com.example.identityservice.config.SecurityConfig;
+import com.example.identityservice.dto.LoginRequest;
+import com.example.identityservice.dto.LoginResponse;
 import com.example.identityservice.dto.RegisterRequest;
 import com.example.identityservice.dto.UserResponse;
 import com.example.identityservice.exception.ResourceNotFoundException;
@@ -12,6 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -85,5 +88,37 @@ class AuthControllerTest {
                         .param("username", "notfound"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.message").value("User not found with username: notfound"));
+    }
+
+    @Test
+    @DisplayName("POST /api/auth/login should return 200 OK and accessToken on valid credentials")
+    void login_Success() throws Exception {
+        LoginRequest request = new LoginRequest("testuser", "securePassword123");
+        LoginResponse response = new LoginResponse("mock.jwt.token", "Bearer");
+
+        when(userService.login(any(LoginRequest.class))).thenReturn(response);
+
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").value("mock.jwt.token"))
+                .andExpect(jsonPath("$.tokenType").value("Bearer"));
+    }
+
+    @Test
+    @DisplayName("POST /api/auth/login should return 401 Unauthorized on invalid credentials")
+    void login_InvalidCredentials_ReturnsUnauthorized() throws Exception {
+        LoginRequest request = new LoginRequest("testuser", "wrongPassword");
+
+        when(userService.login(any(LoginRequest.class)))
+                .thenThrow(new BadCredentialsException("Bad credentials"));
+
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.message").value("Bad credentials"))
+                .andExpect(jsonPath("$.status").value(401));
     }
 }
